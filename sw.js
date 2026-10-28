@@ -1,5 +1,5 @@
 /* Assets Manager service worker — caches the app shell so it works offline. Bump VERSION on every release. */
-const VERSION = 'am-v2.0.0';
+const VERSION = 'am-v2.1.0';
 const SHELL = [
   './', './index.html', './manifest.webmanifest', './css/style.css',
   './vendor/mp4-muxer.js', './vendor/webm-muxer.js',

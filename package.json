@@ -1,6 +1,6 @@
 {
   "name": "assets-manager",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Browser-based toolkit for game assets: sprite sheets, trim, background removal, compression, batch rename and GIF/MP4/WebM export.",
   "private": true,
   "license": "MIT",

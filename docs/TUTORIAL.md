@@ -51,6 +51,19 @@ The bottom-left **Storage** panel shows it:
   - The browser asks for permission once. If it asks again after a restart, click **Reconnect**.
   - Use **Copy browser projects → folder** to move work you did before connecting.
 
+### Firefox, Safari and other browsers: Import folder + Download changes
+Only Chrome and Edge let a website write to a folder directly. In every other browser, keep your folder in sync in two steps:
+
+1. **📂 Import folder** (Storage panel): pick your `Assets Manager` folder, or a single project folder. Choose how to read it:
+   - *contains my projects*: `Assets Manager/<project>/<folder>/files` creates one project per sub-folder
+   - *is one project*: `<project>/<folder>/files`
+   - *add into the current project*: `<folder>/files`
+   Tick **Replace files that already exist** to refresh files you edited outside the app. Atlas `.json` files next to sprite sheets are read too.
+2. Work normally. The **⬇ Changes (N)** button counts files created or modified since the import.
+3. Click **⬇ Changes** to download a ZIP named like `My Game_changes_2026-10-28_1713.zip`. It already has the `My Game/<folder>/file` structure. **Extract it into your `Assets Manager` folder** and choose *Replace*. The counter then goes back to 0.
+
+> Deleted or renamed files are not removed from your disk by the ZIP; remove the old copies by hand. Chrome/Edge's **Connect computer folder** doesn't have this limitation.
+
 ---
 
 ## 2. Library
@@ -238,8 +251,8 @@ Open it from **Export GIF / video…** in the Sprite Sheet preview, or **Export 
 
 ## 11. FAQ and troubleshooting
 
-**The "Connect computer folder" button shows a message instead of a folder picker.**
-Your browser or window doesn't allow folder access (e.g. Firefox/Safari, or the app embedded in another page). Use Chrome/Edge with the online app or the single-file version, or use **Export ZIP**.
+**I use Firefox / Safari. How do I work with my folder?**
+Use **📂 Import folder** and **⬇ Changes** in the Storage panel (see [section 1](#firefox-safari-and-other-browsers-import-folder--download-changes)). The "Connect computer folder" button only appears in Chrome and Edge.
 
 **MP4/WebM buttons are disabled.**
 Your browser doesn't support video encoding (WebCodecs). Use Chrome or Edge, or export a GIF.
@@ -252,6 +265,9 @@ In browser storage mode they are deleted with the site data. Keep backups with *
 
 **The online app didn't update.**
 It works offline through a cache. Close every tab of the app and open it again (or press Ctrl+F5).
+
+**How can I support the project?**
+☕ [buymeacoffee.com/drehdantas](https://buymeacoffee.com/drehdantas). Thank you!
 
 **How do I report a bug or suggest a feature?**
 Open an issue at https://github.com/drehdantas/assets-manager/issues.

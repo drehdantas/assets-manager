@@ -10,7 +10,8 @@ Sprite sheets · trim & background removal · lossless compression · batch rena
 [**▶ Open the app**](https://drehdantas.github.io/assets-manager/) &nbsp;·&nbsp;
 [Tutorial](docs/TUTORIAL.md) &nbsp;·&nbsp;
 [Download single-file version](https://drehdantas.github.io/assets-manager/assets-manager.html) &nbsp;·&nbsp;
-[Changelog](CHANGELOG.md)
+[Changelog](CHANGELOG.md) &nbsp;·&nbsp;
+[☕ Support](https://buymeacoffee.com/drehdantas)
 
 ![Assets Manager — sprite sheet maker](docs/screenshots/sprite-sheet.png)
 
@@ -36,7 +37,7 @@ Drawing tools export every frame at the full canvas size, with lots of empty spa
 | 🎞 **Export** | **GIF, MP4 (H.264) and WebM (VP9)** at sprite scale, or with **social media presets** (Instagram, Reels/TikTok/Shorts, Stories, YouTube, X, LinkedIn, Facebook, Bluesky, Discord, Steam, itch.io). Length is always a **whole number of loops**, within each platform's limit. |
 | ☰ **Batch** | Rename many files with patterns (`hero_run_{n}`), numbering, find & replace (with regex) and case styles (snake_case, kebab-case, PascalCase…). Optionally convert to PNG/WebP/JPG and resize. Apply to the library, save copies or download a ZIP. |
 | ↶ **History** | Undo and redo (Ctrl+Z / Ctrl+Shift+Z) for library changes and tool edits, plus a history list to jump back to any step. |
-| 💾 **Storage** | Saves in the browser by default, or **straight to a folder on your computer** (Chrome/Edge), one sub-folder per project. Sprite sheets keep their `.json` next to the `.png`. |
+| 💾 **Storage** | Saves in the browser by default, or **straight to a folder on your computer** (Chrome/Edge), one sub-folder per project. **In any browser** (Firefox, Safari…), **Import folder** loads your folder tree and **Download changes** returns what changed as a ZIP with the same structure. Sprite sheets keep their `.json` next to the `.png`. |
 
 <table>
 <tr>
@@ -75,7 +76,8 @@ There is no build step: `index.html` loads plain JavaScript files. Any static se
 | Library, Sprite Sheet, Trim, Compress, Batch, GIF export | ✅ | ✅ |
 | Frame-by-frame GIF playback (ImageDecoder) | ✅ | ⚠️ depends on the browser; falls back to normal playback |
 | MP4 / WebM export (WebCodecs) | ✅ | ⚠️ depends on the browser; the button is disabled if unsupported |
-| Save straight to a computer folder | ✅ | ❌ use **Export ZIP** instead |
+| Save straight to a computer folder (live) | ✅ | ❌ |
+| Sync with a computer folder (**Import folder** + **Download changes**) | ✅ | ✅ |
 
 Use **Chrome or Edge on desktop** for the full experience; it's what the app is tested on.
 
@@ -157,6 +159,14 @@ No analytics, no tracking, no uploads. The only network requests are the Google 
 - [ ] Desktop build (Tauri) for native folder watching
 
 Suggestions and bug reports are welcome in [Issues](https://github.com/drehdantas/assets-manager/issues).
+
+## Support
+
+Assets Manager is free and open source. If it saves you time, you can support its development:
+
+<a href="https://buymeacoffee.com/drehdantas"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-%E2%98%95-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy me a coffee"></a>
+
+Starring the repository ⭐, reporting bugs and sharing the tool with other devs also helps a lot.
 
 ## Contributing
 

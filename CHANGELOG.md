@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.0 — 2026-10-28
+- **Folder sync in any browser** (Firefox, Safari…): *Import folder* reads a whole folder tree into projects/folders, and *Download changes* returns new or modified files as a ZIP with the same structure
+- "Connect computer folder" only shows in browsers that support it
+- After opening a project, the first folder with files is selected
+- ☕ Support link (Buy Me a Coffee) in the app and README
+
 ## 2.0.0 — 2026-10-28
 - Export animations as **GIF, MP4 (H.264) and WebM (VP9)**, at sprite scale or with **social media presets**; length always a whole number of loops
 - **Manual crop editor** in Trim (draw, move, resize, numeric input, apply to all)

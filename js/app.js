@@ -5,7 +5,9 @@ const App = {
   assets: [], selected: new Set(), lastClicked: null, filter: '',
   urls: new Map(), tab: 'library',
 };
-const ROOT_HINT = 'C:\\Users\\drehd\\Documents\\Projetos\\Assets Manager';
+const ROOT_HINT = 'Documents\\Assets Manager';
+const SUPPORT_URL = 'https://buymeacoffee.com/drehdantas';
+const canPickDir = () => 'showDirectoryPicker' in window && window.self === window.top;
 const TABS = ['library', 'sheet', 'trim', 'compress', 'anim', 'batch'];
 const assetKey = a => `${a.project}/${a.folder}/${a.name}`;
 function assetURL(a) {
@@ -20,7 +22,7 @@ async function snap(a) {
   const blob = App.backend.kind === 'disk' ? new Blob([await a.blob.arrayBuffer()], { type: a.blob.type || mimeOf(a.name) }) : a.blob;
   return { project: a.project, folder: a.folder, name: a.name, meta: a.meta || null, blob };
 }
-async function afterLibChange() { await refreshFolders(App.folder); }
+async function afterLibChange() { await refreshFolders(App.folder); if (App.backend.kind !== 'disk') updateStorageUI(); }
 async function opSave(list, label, { record = true, refresh = true } = {}) {
   const be = App.backend; const done = [];
   for (const it of list) { const p = it.project || App.project; const name = await be.saveAsset(p, it.folder, it.name, it.blob, it.meta || null); done.push({ ...it, project: p, name }); }
@@ -90,8 +92,10 @@ async function refreshFolders(select) {
   if (!App.folders.length) { for (const f of DEFAULT_FOLDERS) await App.backend.createFolder(App.project, f); App.folders = await App.backend.listFolders(App.project); }
   const want = select || App.folder;
   const prev = App.folder;
-  App.folder = App.folders.includes(want) ? want : (App.folders.find(f => /^origina/i.test(f)) || App.folders[0]);
   try { App.stats = await App.backend.folderStats(App.project); } catch (e) { App.stats = {}; }
+  const cnt = f => (App.stats[f] || {}).count || 0;
+  const orig = App.folders.find(f => /^origina/i.test(f));
+  App.folder = App.folders.includes(want) ? want : (orig && cnt(orig) ? orig : (App.folders.find(f => cnt(f) > 0) || orig || App.folders[0]));
   for (const f of App.folders) if (!App.seen[seenKey(f)]) { const st = App.stats[f] || { count: 0, latest: 0 }; App.seen[seenKey(f)] = { t: st.latest, count: st.count }; }
   if (prev !== App.folder || !App.newSince) { const s = App.seen[seenKey(App.folder)]; App.newSince = s ? s.t : Date.now(); }
   markSeen(App.folder);
@@ -383,13 +387,103 @@ function updateStorageUI() {
         h('button', { class: 'btn sm', onclick: copyBrowserToDisk }, 'Copy browser projects → folder'),
         h('button', { class: 'btn sm', onclick: disconnectFolder }, 'Disconnect folder')));
   } else {
-    p.append(h('p', {}, 'Projects are stored in this browser. Connect the folder to save straight to:'),
-      h('div', { class: 'path' }, ROOT_HINT),
+    const direct = canPickDir();
+    const changesBtn = h('button', { class: 'btn sm', onclick: downloadChanges, title: 'Download what changed since the last import/sync as a ZIP with the same folder structure' }, '⬇ Download changes');
+    p.append(h('p', {}, direct ? 'Projects are stored in this browser. Connect a folder (e.g. ' : 'Projects are stored in this browser. This browser can\'t write to folders directly, so sync with your ', direct ? h('span', { class: 'mono' }, ROOT_HINT) : h('b', {}, 'Assets Manager folder'), direct ? ') to save straight to disk.' : ' using Import / Download changes.'),
       h('div', { class: 'stack' },
-        App.pendingHandle ? h('button', { class: 'btn sm primary', onclick: reconnectFolder }, `Reconnect "${App.pendingHandle.name}"`) : null,
-        h('button', { class: 'btn sm' + (App.pendingHandle ? '' : ' primary'), onclick: connectFolder }, '📁 Connect computer folder')));
+        direct && App.pendingHandle ? h('button', { class: 'btn sm primary', onclick: reconnectFolder }, `Reconnect "${App.pendingHandle.name}"`) : null,
+        direct ? h('button', { class: 'btn sm' + (App.pendingHandle ? '' : ' primary'), onclick: connectFolder }, '📁 Connect computer folder') : null,
+        h('div', { class: 'row' },
+          h('button', { class: 'btn sm' + (direct ? '' : ' primary'), style: { flex: 1 }, onclick: importFolder, title: 'Read a folder from your computer (works in every browser)' }, '📂 Import folder'),
+          changesBtn)));
+    syncChangeCount().then(n => { changesBtn.textContent = `⬇ Changes (${n})`; changesBtn.disabled = !n; }).catch(() => { });
   }
+  p.append(h('a', { class: 'support-link', href: SUPPORT_URL, target: '_blank', rel: 'noopener' }, '☕ Support us — buy me a coffee'));
 }
+
+/* ---------- any-browser folder sync: import a folder, download what changed ---------- */
+function pickDirectory() {
+  return new Promise(res => {
+    const inp = h('input', { type: 'file', multiple: true }); inp.webkitdirectory = true;
+    inp.addEventListener('change', () => res([...inp.files]));
+    inp.addEventListener('cancel', () => res([]));
+    inp.click();
+  });
+}
+async function getSyncBase() { return (await Store.kvGet('syncBase')) || {}; }
+async function setSyncBase(project, data) { const b = await getSyncBase(); b[project] = { ...(b[project] || {}), ...data }; await Store.kvSet('syncBase', b); }
+async function syncChangeCount() {
+  const base = (await getSyncBase())[App.project]; const t = base ? base.t : 0;
+  return (await Store.aAll()).filter(a => a.project === App.project && (a.created || 0) > t).length;
+}
+async function importFolder() {
+  const files = (await pickDirectory()).filter(f => !['other'].includes(kindOf(f.name, f.type)));
+  if (!files.some(f => kindOf(f.name, f.type) !== 'json')) { if (files.length) toast('No images or videos found in that folder', 'warn'); return; }
+  const rel = f => (f.webkitRelativePath || f.name).split('/');
+  const root = rel(files[0])[0];
+  const depth = Math.max(...files.map(f => rel(f).length));
+  const def = depth >= 4 ? 'projects' : depth === 3 ? 'project' : 'current';
+  const opt = (v, title, desc) => h('label', { class: 'check', style: { alignItems: 'flex-start' } }, h('input', { type: 'radio', name: 'imode', value: v, checked: v === def }), h('span', {}, h('b', {}, title), h('br'), h('small', {}, desc)));
+  const repl = h('input', { type: 'checkbox', checked: true });
+  const body = h('div', {},
+    h('p', {}, `Found ${files.filter(f => kindOf(f.name, f.type) !== 'json').length} file(s) in "${root}". How should it be imported?`),
+    opt('projects', `"${root}" contains my projects`, `e.g. the Assets Manager folder: ${root}/<project>/<folder>/files`),
+    opt('project', `"${root}" is one project`, `${root}/<folder>/files becomes the project "${root}"`),
+    opt('current', `Add into the current project (${App.project})`, `${root}/files becomes the folder "${root}"`),
+    h('label', { class: 'check', style: { marginTop: '10px' } }, repl, 'Replace files that already exist with the same name'));
+  const mode = await modal({ title: 'Import folder', body, actions: [{ label: 'Cancel', value: null }, { label: 'Import', primary: true, value: b => b.querySelector('input[name=imode]:checked').value }] });
+  if (!mode) return;
+  const target = f => {
+    const parts = rel(f); const name = parts[parts.length - 1]; let project, fp;
+    if (mode === 'projects') { project = parts.length >= 3 ? parts[1] : App.project; fp = parts.slice(2, -1); }
+    else if (mode === 'project') { project = root; fp = parts.slice(1, -1); }
+    else { project = App.project; fp = parts.slice(0, -1); }
+    return { project: sanitize(project), folder: fp.length ? sanitize(fp.join('-')) : 'originals', name };
+  };
+  const be = App.browser; const existing = new Set(await be.listProjects());
+  const jsons = new Map();
+  for (const f of files) if (kindOf(f.name) === 'json') { const t = target(f); try { jsons.set(`${t.project}/${t.folder}/${stem(t.name)}`, atlasToMeta(JSON.parse(await f.text()))); } catch (e) { } }
+  const done = [], overwritten = [], projects = new Set();
+  await withBusy('Importing folder…', async () => {
+    let i = 0; const list = files.filter(f => kindOf(f.name, f.type) !== 'json');
+    for (const f of list) {
+      const t = target(f); projects.add(t.project);
+      if (!existing.has(t.project)) { await be.createProject(t.project).catch(() => { }); existing.add(t.project); }
+      if (repl.checked) { const old = await Store.aGet(`${t.project}/${t.folder}/${t.name}`); if (old) overwritten.push(old); }
+      const name = await be.saveAsset(t.project, t.folder, t.name, f, jsons.get(`${t.project}/${t.folder}/${stem(t.name)}`) || null, { overwrite: repl.checked });
+      done.push({ project: t.project, folder: t.folder, name });
+      if (++i % 20 === 0) busy(`Importing folder… ${i}/${list.length}`);
+    }
+  });
+  const now = Date.now() + 1;
+  for (const pr of projects) await setSyncBase(pr, { t: now, root, mode });
+  History.push(`Import folder ${root} (${done.length} files)`,
+    async () => { for (const d of done) await be.deleteAsset(d.project, d.folder, d.name).catch(() => { }); for (const o of overwritten) await Store.aPut(o); },
+    async () => { toast('Re-import the folder to redo this', 'warn'); });
+  toast(`Imported ${done.length} file(s) into ${projects.size} project(s)`, 'ok', 5000);
+  App.folder = null; await refreshProjects(projects.has(App.project) ? App.project : [...projects].sort(naturalCmp)[0]); updateStorageUI();
+}
+async function downloadChanges() {
+  const base = (await getSyncBase())[App.project]; const t = base ? base.t : 0;
+  const changed = (await Store.aAll()).filter(a => a.project === App.project && (a.created || 0) > t);
+  if (!changed.length) return toast('No changes since the last sync', 'info');
+  const files = [];
+  for (const a of changed) for (const x of await assetFiles(a)) files.push({ name: `${App.project}/${a.folder}/${x.name}`, blob: x.blob });
+  const d = new Date(), pad = n => String(n).padStart(2, '0');
+  const zipName = `${sanitize(App.project)}_changes_${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}.zip`;
+  const ok = await downloadBlob(zipName, await makeZip(files));
+  if (!ok) return;
+  await setSyncBase(App.project, { t: Date.now() + 1 });
+  updateStorageUI();
+  modal({
+    title: 'Changes downloaded', body: h('div', {},
+      h('p', {}, `${changed.length} new or changed file(s) were saved in `, h('b', {}, zipName), '.'),
+      h('p', {}, 'Extract the ZIP ', h('b', {}, `into the folder that contains "${App.project}"`), ` (for example ${ROOT_HINT}) and choose "Replace" when asked. The files land in the right project sub-folders.`),
+      h('p', {}, 'Deleted or renamed files are not removed from your computer automatically; delete the old ones by hand if needed.')),
+    actions: [{ label: 'OK', primary: true, value: true }]
+  });
+}
+
 async function useDisk(handle) {
   App.backend = new DiskBackend(handle); App.pendingHandle = null;
   try { await Store.kvSet('rootHandle', handle); } catch (e) { }
@@ -397,7 +491,7 @@ async function useDisk(handle) {
   toast(`Connected to folder "${handle.name}"`, 'ok');
 }
 async function connectFolder() {
-  if (!window.showDirectoryPicker) return folderHelp('This browser does not allow direct folder access.');
+  if (!canPickDir()) return folderHelp('This browser does not allow direct folder access.');
   try { await useDisk(await window.showDirectoryPicker({ id: 'assets-manager', mode: 'readwrite', startIn: 'documents' })); }
   catch (e) { if (e && e.name === 'AbortError') return; folderHelp('Folder access is blocked in this window (' + (e && e.name || 'error') + ').'); }
 }
@@ -413,8 +507,8 @@ function folderHelp(reason) {
   return modal({
     title: 'Save straight to your computer folder', body: h('div', {},
       h('p', {}, reason),
-      h('p', {}, h('b', {}, 'To write straight to the folder: '), 'open the file ', h('b', {}, 'Assets Manager.html'), ' (it is in ', h('span', { class: 'mono' }, ROOT_HINT), ') in Chrome or Edge, click "Connect computer folder" and choose the Assets Manager folder. Each project becomes a sub-folder.'),
-      h('p', {}, 'Meanwhile everything is stored in this browser, and you can use ', h('b', {}, 'Export ZIP'), ' and extract it inside the folder.')),
+      h('p', {}, h('b', {}, 'To write straight to a folder: '), 'open the app in Chrome or Edge (online at drehdantas.github.io/assets-manager, or the single-file version), click "Connect computer folder" and choose your Assets Manager folder. Each project becomes a sub-folder.'),
+      h('p', {}, 'In other browsers (Firefox, Safari…) use ', h('b', {}, '📂 Import folder'), ' to load your folder and ', h('b', {}, '⬇ Changes'), ' to download what changed as a ZIP with the same structure.')),
     actions: [{ label: 'Got it', primary: true, value: true }]
   });
 }
@@ -445,6 +539,7 @@ async function renameProject() {
   const be = App.backend;
   try {
     await withBusy('Renaming project…', () => be.renameProject(old, nn));
+    try { const sb = await getSyncBase(); if (sb[old]) { sb[nn] = sb[old]; delete sb[old]; await Store.kvSet('syncBase', sb); } } catch (e) { }
     History.push(`Rename project ${old} → ${nn}`, async () => { await be.renameProject(nn, old); App.project = old; await refreshProjects(old); }, async () => { await be.renameProject(old, nn); App.project = nn; await refreshProjects(nn); });
     App.project = nn; await refreshProjects(nn); updateStorageUI(); toast('Project renamed', 'ok');
   } catch (e) { toast(e.message, 'err'); }
