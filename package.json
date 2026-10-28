@@ -1,0 +1,12 @@
+{
+  "name": "assets-manager",
+  "version": "2.0.0",
+  "description": "Browser-based toolkit for game assets: sprite sheets, trim, background removal, compression, batch rename and GIF/MP4/WebM export.",
+  "private": true,
+  "license": "MIT",
+  "author": "André Dantas de Campos",
+  "scripts": {
+    "start": "npx --yes serve -l 5173 .",
+    "build:single": "node scripts/build-single.mjs"
+  }
+}

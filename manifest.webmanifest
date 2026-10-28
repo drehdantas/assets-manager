@@ -1,0 +1,15 @@
+{
+  "name": "Assets Manager",
+  "short_name": "Assets Manager",
+  "description": "Sprite sheets, trim, background removal, compression, batch rename and GIF/MP4/WebM export for game assets — 100% in your browser.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0d0f13",
+  "theme_color": "#141820",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

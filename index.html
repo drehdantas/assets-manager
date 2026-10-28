@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Assets Manager</title>
+<meta name="description" content="Sprite sheets, trim, background removal, compression, batch rename and GIF/MP4/WebM export for game assets — 100% in your browser.">
+<meta name="theme-color" content="#141820">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="logo"><svg viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1" opacity=".45"/></svg></span>Assets Manager <span class="ver">v2.0</span></div>
+  <nav class="tabs" id="tabs">
+    <button data-tab="library" class="active">Library</button>
+    <button data-tab="sheet">Sprite Sheet</button>
+    <button data-tab="trim">Trim</button>
+    <button data-tab="compress">Compress</button>
+    <button data-tab="anim">Animation</button>
+    <button data-tab="batch">Batch</button>
+  </nav>
+  <div class="top-right">
+    <div class="history-ctrls">
+      <button class="icon-btn" id="undoBtn" title="Undo (Ctrl+Z)" disabled>↶</button>
+      <button class="icon-btn" id="redoBtn" title="Redo (Ctrl+Shift+Z)" disabled>↷</button>
+      <button class="btn sm" id="historyBtn" title="History">History ▾</button>
+    </div>
+    <div class="storage-badge" id="storageBadge"></div>
+  </div>
+</header>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="side-sec">
+      <div class="side-title">Project</div>
+      <div class="row"><select id="projSel" class="input"></select><button class="icon-btn" id="newProj" title="New project">+</button></div>
+      <div class="row" style="margin-top:8px;gap:12px">
+        <button class="link-btn" id="renameProj">Rename</button>
+        <button class="link-btn" id="exportProj">Export ZIP</button>
+        <div class="spacer"></div>
+        <button class="link-btn danger" id="delProj">Delete</button>
+      </div>
+    </div>
+    <div class="side-sec grow">
+      <div class="side-title">Folders <button class="icon-btn sm" id="newFolder" title="New folder">+</button></div>
+      <ul id="folderList" class="folder-list"></ul>
+      <p class="muted" style="font-size:11.5px;margin-top:12px">Tip: drag cards from the library onto a folder to move them. <span class="new-dot"></span> = new files since your last visit.</p>
+    </div>
+    <div class="side-sec storage-panel" id="storagePanel"></div>
+  </aside>
+
+  <main id="main">
+    <!-- LIBRARY -->
+    <section class="tab-panel active" id="tab-library">
+      <div class="toolbar">
+        <button class="btn primary" id="libUpload">⬆ Upload files</button>
+        <input type="search" class="input" id="libSearch" placeholder="Filter by name…">
+        <span class="sel-info" id="libSelInfo"></span>
+        <div class="spacer"></div>
+        <div class="btn-group" id="libActions">
+          <button class="btn sm" id="libSendTo">Send to ▾</button>
+          <button class="btn sm" id="libDownload">Download</button>
+          <button class="btn sm danger" id="libDelete">Delete</button>
+        </div>
+      </div>
+      <div class="lib-body" id="libBody">
+        <div class="lib-grid" id="libGrid"></div>
+        <div class="empty hidden" id="libEmpty">Drop images, GIFs, videos or sprite sheets here<br><small>PNG · JPG · WebP · GIF · SVG · BMP · AVIF · MP4 · WebM — upload the atlas .json together with the .png to keep the grid</small></div>
+        <div class="drop-overlay">Drop to upload to&nbsp;<b id="dropFolder"></b></div>
+      </div>
+    </section>
+
+    <!-- SPRITE SHEET -->
+    <section class="tab-panel" id="tab-sheet">
+      <div class="tool">
+        <div class="opts">
+          <h4>Layout</h4>
+          <label class="field"><span>Arrangement</span>
+            <select id="sh_layout"><option value="grid">Grid</option><option value="row">Horizontal strip</option><option value="col">Vertical strip</option></select></label>
+          <label class="field"><span>Columns <small>0 = auto</small></span><input type="number" id="sh_cols" min="0" value="0"></label>
+          <label class="field"><span>Cell size</span>
+            <select id="sh_cell"><option value="max">Auto (largest frame)</option><option value="custom">Custom</option></select></label>
+          <div class="field two hidden" id="sh_customCell"><label>Width<input type="number" id="sh_cw" value="64" min="1"></label><span>×</span><label>Height<input type="number" id="sh_ch" value="64" min="1"></label></div>
+          <label class="field"><span>Alignment in cell</span>
+            <select id="sh_align"><option value="center">Center</option><option value="bottom">Bottom (feet on the ground)</option><option value="topleft">Top-left</option></select></label>
+          <h4>Auto trim</h4>
+          <label class="field"><span>Remove empty space</span>
+            <select id="sh_trim"><option value="none">No</option><option value="union" selected>Together (keeps alignment)</option><option value="each">Individually (each frame)</option></select></label>
+          <p class="hint">"Together" uses the same box for every frame, so the animation doesn't jitter. "Individually" crops each frame as tight as possible.</p>
+          <label class="field"><span>Alpha threshold <b id="sh_alphaV">0</b></span><input type="range" id="sh_alpha" min="0" max="254" value="0"></label>
+          <h4>Spacing</h4>
+          <div class="field two"><label>Padding (px)<input type="number" id="sh_pad" value="0" min="0"></label><label>Margin (px)<input type="number" id="sh_margin" value="0" min="0"></label></div>
+          <h4>Output</h4>
+          <label class="field"><span>Scale</span><select id="sh_scale"><option>0.25</option><option>0.5</option><option selected>1</option><option>2</option><option>3</option><option>4</option></select></label>
+          <label class="check"><input type="checkbox" id="sh_smooth"> Smooth when scaling <small>(off = pixel art)</small></label>
+          <label class="check"><input type="checkbox" id="sh_pot"> Power-of-two size</label>
+          <label class="check"><input type="checkbox" id="sh_bgOn"> Background color <input type="color" id="sh_bg" value="#000000"></label>
+          <label class="field"><span>File name</span><input type="text" id="sh_name" value="spritesheet"></label>
+          <label class="field"><span>Save to folder</span><select id="sh_folder" data-folder-default="spritesheets"></select></label>
+          <div class="stack">
+            <button class="btn primary" id="sh_save">Save PNG + JSON to project</button>
+            <div class="row"><button class="btn" style="flex:1" id="sh_dlPng">PNG</button><button class="btn" style="flex:1" id="sh_dlJson">JSON</button><button class="btn" style="flex:1" id="sh_dlZip">ZIP</button></div>
+          </div>
+        </div>
+        <div class="work">
+          <div class="panel">
+            <div class="panel-head"><b>Frames</b><span class="muted" id="sh_count">0</span><div class="spacer"></div>
+              <button class="btn sm" id="sh_add">+ Files</button>
+              <button class="btn sm" id="sh_addLib">+ From library</button>
+              <button class="btn sm" id="sh_sort">Sort A→Z</button>
+              <button class="btn sm" id="sh_rev">Reverse</button>
+              <button class="btn sm danger" id="sh_clear">Clear</button>
+            </div>
+            <div class="frames" id="sh_frames"></div>
+          </div>
+          <div class="split">
+            <div class="panel">
+              <div class="panel-head"><b>Result</b><span class="muted mono" id="sh_info"></span><div class="spacer"></div>
+                <label class="check sm"><input type="checkbox" id="sh_grid" checked> Grid</label>
+                <select id="sh_zoom" class="sm"><option value="fit">Fit</option><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option></select>
+              </div>
+              <div class="viewport checker" id="sh_view"><div class="stagewrap" id="sh_stage"></div></div>
+            </div>
+            <div class="panel">
+              <div class="panel-head"><b>Animation preview</b><div class="spacer"></div><button class="btn sm primary" id="sh_export">Export GIF / video…</button></div>
+              <div class="viewport checker small" id="sh_animView"></div>
+              <div class="player-ctrls" id="sh_animCtrls"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TRIM -->
+    <section class="tab-panel" id="tab-trim">
+      <div class="tool">
+        <div class="opts">
+          <h4>Remove background</h4>
+          <label class="check"><input type="checkbox" id="tr_bgOn"> Remove a solid background</label>
+          <div id="tr_bgF" class="hidden">
+            <label class="field"><span>Method</span>
+              <select id="tr_bgMode"><option value="flood">Flood from edges (recommended)</option><option value="global">Every matching color</option></select></label>
+            <p class="hint">Flood only removes background connected to the borders, so matching colors inside the sprite (white eyes, etc.) are kept.</p>
+            <label class="field"><span>Background color</span>
+              <select id="tr_bgPick"><option value="auto">Auto (image corners)</option><option value="custom">Custom color</option></select></label>
+            <div class="row hidden" id="tr_bgCustom" style="margin:-4px 0 10px"><input type="color" id="tr_bgColor" value="#ffffff"><button class="btn sm" id="tr_eyedrop" title="Pick a color from the screen">💧 Eyedropper</button></div>
+            <label class="field"><span>Tolerance <b id="tr_tolV">24</b></span><input type="range" id="tr_tol" min="0" max="160" value="24"></label>
+            <label class="field"><span>Edge softness <b id="tr_softV">16</b></span><input type="range" id="tr_soft" min="0" max="80" value="16"></label>
+            <label class="check"><input type="checkbox" id="tr_defringe" checked> Clean color halo on edges</label>
+          </div>
+          <h4>Auto crop</h4>
+          <label class="field"><span>Alpha threshold <b id="tr_alphaV">0</b></span><input type="range" id="tr_alpha" min="0" max="254" value="0"></label>
+          <p class="hint">Raise it to ignore almost invisible pixels (brush dirt / anti-aliasing).</p>
+          <label class="field"><span>Crop box</span>
+            <select id="tr_union"><option value="each">Individual (each image)</option><option value="union">Together (same box for all)</option></select></label>
+          <label class="field"><span>Extra margin (px)</span><input type="number" id="tr_pad" value="0" min="0"></label>
+          <label class="field"><span>Round size to multiple of</span><select id="tr_mult"><option value="1">— (exact)</option><option>2</option><option>4</option><option>8</option><option>16</option><option>32</option></select></label>
+          <p class="hint">Click <b>✎ Edit area</b> on any card to draw the crop area yourself.</p>
+          <h4>Save</h4>
+          <label class="field"><span>Name suffix</span><input type="text" id="tr_suffix" value="_trim"></label>
+          <label class="field"><span>Save to folder</span><select id="tr_folder" data-folder-default="trim"></select></label>
+          <label class="check"><input type="checkbox" id="tr_overwrite"> Replace the originals in the library</label>
+          <div class="stack">
+            <button class="btn primary" id="tr_save">Save all to project</button>
+            <div class="row"><button class="btn" style="flex:1" id="tr_zip">Download ZIP</button><button class="btn" style="flex:1" id="tr_toSheet">→ Sprite Sheet</button></div>
+          </div>
+        </div>
+        <div class="work">
+          <div class="panel grow">
+            <div class="panel-head"><b>Images</b><span class="muted" id="tr_count">0</span><span class="muted mono" id="tr_sum"></span><div class="spacer"></div>
+              <button class="btn sm" id="tr_add">+ Files</button><button class="btn sm" id="tr_addLib">+ From library</button><button class="btn sm danger" id="tr_clear">Clear</button></div>
+            <div class="tgrid" id="tr_grid"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- COMPRESS -->
+    <section class="tab-panel" id="tab-compress">
+      <div class="tool">
+        <div class="opts">
+          <h4>Dimensions</h4>
+          <label class="field"><span>Resize</span><select id="cp_scale"><option value="1">100% (original)</option><option value="0.75">75%</option><option value="0.5">50%</option><option value="0.25">25%</option></select></label>
+          <label class="check"><input type="checkbox" id="cp_smooth" checked> Smooth when shrinking <small>(off = pixel art)</small></label>
+          <h4>Quality</h4>
+          <label class="field"><span>Quality target</span>
+            <select id="cp_level"><option value="lossless">Lossless (identical)</option><option value="high" selected>High — imperceptible (≥ 45 dB)</option><option value="balanced">Balanced (≥ 40 dB)</option><option value="aggressive">Aggressive (≥ 35 dB)</option></select></label>
+          <label class="check"><input type="checkbox" id="cp_dither"> Dithering on PNG-8</label>
+          <p class="hint">Dithering helps gradients; leave it off for pixel art and flat art.</p>
+          <label class="check"><input type="checkbox" id="cp_lossy"> Allow WebP/JPEG in the recommendation</label>
+          <p class="hint">PNG works in every engine. WebP is smaller, but Unity doesn't import WebP natively (Godot and web do).</p>
+          <h4>Save</h4>
+          <label class="field"><span>Save to folder</span><select id="cp_folder" data-folder-default="compressed"></select></label>
+          <div class="stack">
+            <button class="btn primary" id="cp_saveAll">Save all recommended</button>
+            <button class="btn" id="cp_zipAll">Download recommended (ZIP)</button>
+          </div>
+        </div>
+        <div class="work">
+          <div class="panel">
+            <div class="panel-head"><b>Files</b><span class="muted" id="cp_count">0</span><span class="muted mono" id="cp_total"></span><div class="spacer"></div>
+              <button class="btn sm" id="cp_add">+ Files</button><button class="btn sm" id="cp_addLib">+ From library</button><button class="btn sm danger" id="cp_clear">Clear</button></div>
+            <div class="clist" id="cp_list"></div>
+          </div>
+          <div class="split" style="grid-template-columns:minmax(400px,1fr) minmax(0,1fr)">
+            <div class="panel">
+              <div class="panel-head"><b>Variants</b><span class="muted" id="cp_cur"></span></div>
+              <div id="cp_rec"></div>
+              <div style="overflow:auto"><table class="vt" id="cp_table"></table></div>
+            </div>
+            <div class="panel">
+              <div class="panel-head"><b>Compare</b><span class="muted" style="font-size:12px">hover over the image</span><div class="spacer"></div>
+                <select id="cp_view" class="sm"><option value="slider">Before | After</option><option value="diff">Difference (×8)</option></select>
+                <select id="cp_zoom" class="sm"><option value="fit">Fit</option><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option></select></div>
+              <div class="viewport checker" id="cp_viewport"></div>
+              <div class="player-ctrls"><div class="row"><button class="btn sm primary" id="cp_saveOne">Save this variant</button><button class="btn sm" id="cp_dlOne">Download</button><span class="muted" id="cp_sel"></span></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ANIMATION -->
+    <section class="tab-panel" id="tab-anim">
+      <div class="tool">
+        <div class="opts" id="an_opts">
+          <h4>Source</h4>
+          <div class="stack">
+            <button class="btn" id="an_open">Open file…</button>
+            <button class="btn" id="an_openLib">Choose from library…</button>
+          </div>
+          <p class="hint" style="margin-top:10px" id="an_srcInfo">Open a GIF, MP4/WebM or sprite sheet to preview the animation.</p>
+          <div id="an_sheetOpts" class="hidden">
+            <h4>Slice sprite sheet</h4>
+            <label class="field hidden" id="an_animSelF"><span>Animation (from JSON)</span><select id="an_animSel"></select></label>
+            <div class="field two"><label>Columns<input type="number" id="an_cols" value="1" min="1"></label><label>Rows<input type="number" id="an_rows" value="1" min="1"></label></div>
+            <div class="field two"><label>Padding<input type="number" id="an_pad" value="0" min="0"></label><label>Margin<input type="number" id="an_margin" value="0" min="0"></label></div>
+            <div class="field two"><label>First frame<input type="number" id="an_start" value="1" min="1"></label><label>Last frame<input type="number" id="an_end" value="1" min="1"></label></div>
+            <p class="hint mono" id="an_frameSize"></p>
+            <button class="btn sm" id="an_detect">Detect empty frames</button>
+          </div>
+          <div id="an_videoOpts" class="hidden">
+            <h4>Video</h4>
+            <label class="field"><span>Speed</span><select id="an_vspeed"><option>0.25</option><option>0.5</option><option selected>1</option><option>1.5</option><option>2</option></select></label>
+            <h4>Extract frames</h4>
+            <div class="field two"><label>FPS<input type="number" id="an_vfps" value="12" min="1" max="60"></label><label>Max frames<input type="number" id="an_vmax" value="120" min="1"></label></div>
+            <div class="field two"><label>Start (s)<input type="number" id="an_vstart" value="0" min="0" step="0.1"></label><label>End (s)<input type="number" id="an_vend" value="0" min="0" step="0.1"></label></div>
+            <label class="check"><input type="checkbox" id="an_vkey"> Remove background (flood from edges)</label>
+            <button class="btn" id="an_vextract">Extract frames</button>
+          </div>
+          <div id="an_frameActs" class="hidden">
+            <h4>Use frames</h4>
+            <div class="stack">
+              <button class="btn primary" id="an_export">Export GIF / MP4 / WebM…</button>
+              <button class="btn" id="an_toSheet">→ Send to Sprite Sheet</button>
+              <button class="btn" id="an_saveFrames">Save frames as PNG to project</button>
+            </div>
+          </div>
+        </div>
+        <div class="work">
+          <div class="panel grow" style="min-height:420px">
+            <div class="panel-head"><b id="an_title">Player</b><span class="muted mono" id="an_meta"></span></div>
+            <div class="viewport checker" id="an_view"></div>
+            <div class="player-ctrls" id="an_ctrls"></div>
+          </div>
+          <div class="panel hidden" id="an_mapPanel">
+            <div class="panel-head"><b>Sprite sheet</b><span class="muted" style="font-size:12px">click a frame to jump to it</span></div>
+            <div class="sheet-map checker" id="an_map"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BATCH -->
+    <section class="tab-panel" id="tab-batch">
+      <div class="tool">
+        <div class="opts">
+          <h4>Rename</h4>
+          <label class="field"><span>Name pattern</span><input type="text" id="bt_pattern" value="{name}"></label>
+          <p class="hint">Tokens: <code>{name}</code> original name · <code>{n}</code> number · <code>{folder}</code> · <code>{w}</code>/<code>{h}</code> size. Example: <code>hero_run_{n}</code></p>
+          <div class="field two"><label>Start at<input type="number" id="bt_start" value="1"></label><label>Step<input type="number" id="bt_step" value="1"></label><label>Digits<input type="number" id="bt_pad" value="2" min="1" max="8"></label></div>
+          <div class="field two"><label>Find<input type="text" id="bt_find"></label><label>Replace with<input type="text" id="bt_repl"></label></div>
+          <label class="check"><input type="checkbox" id="bt_regex"> Use regular expression</label>
+          <label class="field"><span>Letter case</span>
+            <select id="bt_case"><option value="keep">Keep</option><option value="lower">lowercase</option><option value="upper">UPPERCASE</option><option value="snake">snake_case</option><option value="kebab">kebab-case</option><option value="camel">camelCase</option><option value="pascal">PascalCase</option></select></label>
+          <h4>Convert (optional)</h4>
+          <label class="field"><span>Format</span><select id="bt_format"><option value="keep">Keep original</option><option value="png">PNG</option><option value="webp">WebP</option><option value="jpg">JPG</option></select></label>
+          <label class="field hidden" id="bt_qF"><span>Quality <b id="bt_qV">90</b></span><input type="range" id="bt_q" min="40" max="100" value="90"></label>
+          <label class="field"><span>Resize</span><select id="bt_resize"><option value="none">No</option><option value="scale">By percentage</option><option value="max">Fit inside max size</option></select></label>
+          <div class="field two hidden" id="bt_resizeF"><label id="bt_rLbl">Percent<input type="number" id="bt_rval" value="50" min="1"></label></div>
+          <label class="check"><input type="checkbox" id="bt_smooth" checked> Smooth resize <small>(off = pixel art)</small></label>
+          <h4>Output</h4>
+          <label class="field"><span>Save copies to folder</span><select id="bt_folder" data-folder-default="exports"></select></label>
+          <div class="stack">
+            <button class="btn primary" id="bt_inplace">Apply in library (rename originals)</button>
+            <button class="btn" id="bt_copies">Save as copies</button>
+            <button class="btn" id="bt_zip">Download ZIP with new names</button>
+          </div>
+        </div>
+        <div class="work">
+          <div class="panel grow">
+            <div class="panel-head"><b>Files</b><span class="muted" id="bt_count"></span><span class="muted" id="bt_warn" style="color:var(--warn)"></span><div class="spacer"></div>
+              <button class="btn sm" id="bt_add">+ Files</button><button class="btn sm" id="bt_addLib">+ From library</button>
+              <button class="btn sm" id="bt_sortName">Sort A→Z</button><button class="btn sm" id="bt_sortDate">Sort by date</button><button class="btn sm" id="bt_rev">Reverse</button>
+              <button class="btn sm danger" id="bt_clear">Clear</button></div>
+            <div class="btable-wrap" id="bt_list"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<div id="toasts"></div>
+
+<!-- third-party (MIT): mp4-muxer & webm-muxer by Vanilagy -->
+<script src="vendor/mp4-muxer.js"></script>
+<script src="vendor/webm-muxer.js"></script>
+<!-- app -->
+<script src="js/core.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/player.js"></script>
+<script src="js/media.js"></script>
+<script src="js/app.js"></script>
+<script src="js/tools.js"></script>
+<script src="js/trim_batch.js"></script>
+<script>
+  // Installable app + offline support (only when served over http/https, not from file://)
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol) && window.top === window.self) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+  }
+</script>
+</body>
+</html>
