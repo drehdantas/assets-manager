@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.1.1 — 2026-10-28
+- Import folder: works more reliably in Firefox (the hidden folder input stays attached to the page)
+- Import folder: picking a folder with no images now explains what to do and offers to download the project as a ZIP to extract there, instead of doing nothing
+
 ## 2.1.0 — 2026-10-28
 - **Folder sync in any browser** (Firefox, Safari…): *Import folder* reads a whole folder tree into projects/folders, and *Download changes* returns new or modified files as a ZIP with the same structure
 - "Connect computer folder" only shows in browsers that support it

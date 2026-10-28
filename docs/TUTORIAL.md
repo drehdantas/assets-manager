@@ -266,6 +266,9 @@ In browser storage mode they are deleted with the site data. Keep backups with *
 **The online app didn't update.**
 It works offline through a cache. Close every tab of the app and open it again (or press Ctrl+F5).
 
+**In Firefox, Import folder doesn't put anything in my folder.**
+That's expected: Firefox (and Safari) never let websites write to your disk. *Import* only **reads** the folder. To get files into the folder, click **⬇ Changes** (or the button offered when the folder is empty), then extract the ZIP inside the folder. If the folder has no images yet, the app now offers to download your whole project for that first sync.
+
 **How can I support the project?**
 ☕ [buymeacoffee.com/drehdantas](https://buymeacoffee.com/drehdantas). Thank you!
 

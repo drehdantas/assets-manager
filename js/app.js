@@ -389,7 +389,7 @@ function updateStorageUI() {
   } else {
     const direct = canPickDir();
     const changesBtn = h('button', { class: 'btn sm', onclick: downloadChanges, title: 'Download what changed since the last import/sync as a ZIP with the same folder structure' }, '⬇ Download changes');
-    p.append(h('p', {}, direct ? 'Projects are stored in this browser. Connect a folder (e.g. ' : 'Projects are stored in this browser. This browser can\'t write to folders directly, so sync with your ', direct ? h('span', { class: 'mono' }, ROOT_HINT) : h('b', {}, 'Assets Manager folder'), direct ? ') to save straight to disk.' : ' using Import / Download changes.'),
+    p.append(h('p', {}, direct ? 'Projects are stored in this browser. Connect a folder (e.g. ' : 'Projects are stored in this browser. This browser can\'t save into folders: ', direct ? h('span', { class: 'mono' }, ROOT_HINT) : h('b', {}, '📂 Import'), direct ? ') to save straight to disk.' : ' reads your folder, ', direct ? null : h('b', {}, '⬇ Changes'), direct ? null : ' downloads a ZIP to extract into it.'),
       h('div', { class: 'stack' },
         direct && App.pendingHandle ? h('button', { class: 'btn sm primary', onclick: reconnectFolder }, `Reconnect "${App.pendingHandle.name}"`) : null,
         direct ? h('button', { class: 'btn sm' + (App.pendingHandle ? '' : ' primary'), onclick: connectFolder }, '📁 Connect computer folder') : null,
@@ -403,10 +403,14 @@ function updateStorageUI() {
 
 /* ---------- any-browser folder sync: import a folder, download what changed ---------- */
 function pickDirectory() {
+  // the input is attached to the page (hidden) so every browser keeps it alive until the folder is read
   return new Promise(res => {
-    const inp = h('input', { type: 'file', multiple: true }); inp.webkitdirectory = true;
-    inp.addEventListener('change', () => res([...inp.files]));
-    inp.addEventListener('cancel', () => res([]));
+    const inp = h('input', { type: 'file', multiple: true, webkitdirectory: true, directory: true, style: { position: 'fixed', left: '-9999px', opacity: '0' } });
+    inp.webkitdirectory = true;
+    let done = false; const fin = v => { if (done) return; done = true; inp.remove(); res(v); };
+    inp.addEventListener('change', () => fin([...inp.files]));
+    inp.addEventListener('cancel', () => fin([]));
+    document.body.append(inp);
     inp.click();
   });
 }
@@ -417,10 +421,13 @@ async function syncChangeCount() {
   return (await Store.aAll()).filter(a => a.project === App.project && (a.created || 0) > t).length;
 }
 async function importFolder() {
-  const files = (await pickDirectory()).filter(f => !['other'].includes(kindOf(f.name, f.type)));
-  if (!files.some(f => kindOf(f.name, f.type) !== 'json')) { if (files.length) toast('No images or videos found in that folder', 'warn'); return; }
+  const all = await pickDirectory();
+  if (!all.length) return;
+  busy(`Reading ${all.length} file(s)…`); await sleep(20); busy(null);
   const rel = f => (f.webkitRelativePath || f.name).split('/');
-  const root = rel(files[0])[0];
+  const root = rel(all[0])[0];
+  const files = all.filter(f => kindOf(f.name, f.type) !== 'other');
+  if (!files.some(f => kindOf(f.name, f.type) !== 'json')) return emptyFolderHelp(root);
   const depth = Math.max(...files.map(f => rel(f).length));
   const def = depth >= 4 ? 'projects' : depth === 3 ? 'project' : 'current';
   const opt = (v, title, desc) => h('label', { class: 'check', style: { alignItems: 'flex-start' } }, h('input', { type: 'radio', name: 'imode', value: v, checked: v === def }), h('span', {}, h('b', {}, title), h('br'), h('small', {}, desc)));
@@ -462,6 +469,22 @@ async function importFolder() {
     async () => { toast('Re-import the folder to redo this', 'warn'); });
   toast(`Imported ${done.length} file(s) into ${projects.size} project(s)`, 'ok', 5000);
   App.folder = null; await refreshProjects(projects.has(App.project) ? App.project : [...projects].sort(naturalCmp)[0]); updateStorageUI();
+}
+async function emptyFolderHelp(root) {
+  const total = (await Store.aAll()).filter(a => a.project === App.project).length;
+  if (!total && !canPickDir()) {
+    const r0 = await modal({ title: `"${root}" has no images yet`, body: h('div', {}, h('p', {}, 'Import folder only ', h('b', {}, 'reads'), ' images, GIFs and videos from a folder, and this one has none yet.'), h('p', {}, `Your project "${App.project}" is empty too. Upload some art first, then use ⬇ Changes to download a ZIP and extract it inside "${root}".`)), actions: [{ label: 'Close', value: null }, { label: '⬆ Upload files', primary: true, value: 'up' }] });
+    if (r0 === 'up') { showTab('library'); const f = await pickFiles(); if (f.length) uploadFiles(f); }
+    return;
+  }
+  const r = await modal({
+    title: `"${root}" has no images yet`, body: h('div', {},
+      h('p', {}, 'Import folder only ', h('b', {}, 'reads'), ' images, GIFs and videos from a folder — this one has none yet, so there is nothing to import.'),
+      h('p', {}, canPickDir() ? 'To have the app write straight into it, use ' : 'This browser can\'t write into folders. To put your work there, download the project as a ZIP and ', canPickDir() ? h('b', {}, '📁 Connect computer folder') : h('b', {}, `extract it inside "${root}"`), canPickDir() ? ' instead.' : ' — it already has the right project/folder structure. Next time, use ⬇ Changes to get only what changed.')),
+    actions: canPickDir() ? [{ label: 'Close', value: null }, { label: '📁 Connect computer folder', primary: true, value: 'connect' }] : [{ label: 'Close', value: null }, { label: `⬇ Download "${App.project}" as ZIP`, primary: true, value: 'zip' }]
+  });
+  if (r === 'connect') connectFolder();
+  if (r === 'zip') { await setSyncBase(App.project, { t: 0, root, mode: 'projects' }); await downloadChanges(); }
 }
 async function downloadChanges() {
   const base = (await getSyncBase())[App.project]; const t = base ? base.t : 0;
